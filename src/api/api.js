@@ -1,8 +1,10 @@
 import Axios from 'axios'
 
-export function getAllEmps() {
+export function getAllEmps(params) {
 	return new Promise((resolve, reject) => {
-		Axios.get('/emps/2').then(res => {
+		Axios.get('/emps/' + params.pageNum, {
+			params
+		}).then(res => {
 			resolve(res);
 		}).catch(res => {
 			reject(res)

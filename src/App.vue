@@ -348,7 +348,10 @@
 			// 页面加载时，触发第一次刷新列表的操作
 			this.changePage(this.currentPage)
 			// 不需要使用 this.getAllEmps()，直接使用 getAllEmps() 即可
-			getAllEmps()
+			getAllEmps({
+				pageNum: this.currentPage,
+				pageSize: this.pageSize
+			})
 		}
 	}
 </script>
