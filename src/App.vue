@@ -75,6 +75,7 @@
 	</div>
 </template>
 <script>
+	import { getAllEmps } from './api/api.js'
 	export default {
 		data() {
 			return {
@@ -346,6 +347,8 @@
 		mounted() {
 			// 页面加载时，触发第一次刷新列表的操作
 			this.changePage(this.currentPage)
+			// 不需要使用 this.getAllEmps()，直接使用 getAllEmps() 即可
+			getAllEmps()
 		}
 	}
 </script>
