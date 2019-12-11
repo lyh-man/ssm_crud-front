@@ -19,13 +19,13 @@
 					</template>
 					<template slot-scope="{ row, index }" slot="action">
 						<Button type="primary" size="small" style="margin-right: 5px" @click="show(index)" icon="ios-create-outline">编辑</Button>
-						<Button type="error" size="small" @click="remove(index)" icon="ios-trash">删除</Button>
+						<Button type="error" size="small" @click="remove(row, index)" icon="ios-trash">删除</Button>
 					</template>
 				</Table>
 				<div style="margin: 10px;overflow: hidden">
 					<div style="float: right;">
 						<!-- current 设置当前选中页,pageSize 设置每页显示数据的条数-->
-						<Page :total="data1.length" :pageSize="pageSize" :current="currentPage" @on-change="changePage" show-sizer show-elevator show-total @on-page-size-change="changePageSize"></Page>
+						<Page :total="total" :pageSize="pageSize" :current="currentPage" @on-change="changePage" show-sizer show-elevator show-total @on-page-size-change="changePageSize"></Page>
 					</div>
 				</div>
 			</Content>
@@ -66,8 +66,8 @@
 					<Input v-model="empInfo.email" placeholder="Email..." style="width: 300px;" />
 				</FormItem>
 				<FormItem label="DeptName:">
-					<Select v-model="empInfo.deptName">
-						<Option v-for="(item, index) in dept" :key="index" :value="item.deptName"> {{item.deptName}} </Option>
+					<Select v-model="empInfo.deptid">
+						<Option v-for="(item, index) in dept" :key="index" :value="item.deptid"> {{item.deptname}} </Option>
 					</Select>
 				</FormItem>
 			</Form>
@@ -75,10 +75,12 @@
 	</div>
 </template>
 <script>
-	import { getAllEmps } from './api/api.js'
+	import { getAllEmps, getEmp, deleteEmp, updateEmp, insertEmp, getDeptName } from './api/api.js'
 	export default {
 		data() {
 			return {
+				// 保存列表的总数据
+				total: 0,
 				// 添加与编辑复用 modal 框，false为添加，true为编辑
 				createOrEditor: false,
 				// 是否打开员工信息框
@@ -127,105 +129,7 @@
 						align: 'center'
 					}
 				],
-				dept: [{
-					deptId: '1',
-					deptName: '开发部'
-				},{
-					deptId: '2',
-					deptName: '测试部'
-				},{
-					deptId: '3',
-					deptName: '产品部'
-				}],
-				// 表格的源数据
-				data1: [{
-						name: 'John Brown',
-						salary: 6000,
-						age: 18,
-						email: '323@163.com',
-						deptId: '1',
-						deptName: '开发部'
-					},
-					{
-						name: 'Jim Green',
-						salary: 6000,
-						age: 24,
-						email: '323@163.com',
-						deptId: '2',
-						deptName: '测试部'
-					},
-					{
-						name: 'Joe Black',
-						salary: 6000,
-						age: 30,
-						email: '323@163.com',
-						deptId: '3',
-						deptName: '产品部'
-					},
-					{
-						name: 'Jon Snow',
-						salary: 6000,
-						age: 26,
-						email: '323@163.com',
-						deptId: '1',
-						deptName: '开发部'
-					}, {
-						name: 'John Brown',
-						salary: 6000,
-						age: 18,
-						email: '323@163.com',
-						deptId: '2',
-						deptName: '测试部'
-					},
-					{
-						name: 'Jim Green',
-						salary: 6000,
-						age: 24,
-						email: '323@163.com',
-						deptId: '1',
-						deptName: '开发部'
-					},
-					{
-						name: 'Joe Black',
-						salary: 6000,
-						age: 30,
-						email: '323@163.com',
-						deptId: '1',
-						deptName: '开发部'
-					},
-					{
-						name: 'Jon Snow',
-						salary: 6000,
-						age: 26,
-						email: '323@163.com',
-						deptId: '2',
-						deptName: '测试部'
-					},
-					{
-						name: 'Jim Green',
-						salary: 6000,
-						age: 24,
-						email: '323@163.com',
-						deptId: '1',
-						deptName: '开发部'
-					},
-					{
-						name: 'Joe Black',
-						salary: 6000,
-						age: 30,
-						email: '323@163.com',
-						deptId: '2',
-						deptName: '测试部'
-					},
-					{
-						name: 'Jon Snow',
-						salary: 6000,
-						age: 26,
-						email: '323@163.com',
-						deptId: '3',
-						deptName: '产品部'
-					}
-				],
+				dept: [],
 				// 表格每页的数据
 				data2: [],
 				// 表格边框是否显示
@@ -248,8 +152,17 @@
 			changePage(index) {
 				// 改变当前的页码，并获取当前页码所拥有的数据
 				this.currentPage = index
-				// 注意，此处不能直接用 = 赋值。使用 = 后（指向的地址相同），修改 data2 的同时会修改 data1
-				this.data2 = [].concat(this.data1.slice((index - 1) * this.pageSize, index * this.pageSize))
+				
+				// 获取emps数据,分页查询
+				getAllEmps({
+					pageNum: this.currentPage,
+					pageSize: this.pageSize
+				}).then((res) => {
+					// 保存获取到的 emp 列表
+					this.data2 = res.data.pageInfo.list
+					// 保存获取数据的总数
+					this.total = res.data.pageInfo.total
+				})
 			},
 			show(index) {
 				// 弹出一个模态框，用于展示某条数据的信息
@@ -264,9 +177,13 @@
 				this.empModal = true
 				this.createOrEditor = false
 			},
-			remove(index) {
-				// 删除某条数据（删除源数据）
-				this.data1.splice((this.currentPage - 1) * 10 + index, 1)
+			remove(row, index) {
+				// 删除某个员工的数据
+				deleteEmp({
+					id: row.id
+				}).then((res) => {
+					this.changePage(this.currentPage)
+				})
 			},
 			changePageSize(index) {
 				// 改变每页显示的条数
@@ -280,11 +197,22 @@
 			},
 			okEditor () {
 				if (this.createOrEditor) {
-					// 编辑的操作,修改数据
-					this.data1.splice((this.currentPage - 1) * 10 + this.empInfo.index, 1, this.empInfo)
+					// 更新某个员工的数据
+					const that = this
+					updateEmp(this.empInfo).then((res) => {
+						this.changePage(this.currentPage)
+					})
 				} else {
-					// 添加的操作，修改数据
-					this.data1.push(Object.assign({}, this.empInfo))
+					// 新增某个员工
+					insertEmp({
+						salary: this.empInfo.salary,
+						name: this.empInfo.name,
+						age: this.empInfo.age,
+						email: this.empInfo.email,
+						deptid: this.empInfo.deptid
+					}).then((res) => {
+						this.changePage(Math.ceil((this.total + 1) / this.pageSize))
+					})
 				}
 				this.empInfo = {}
 			},
@@ -334,24 +262,21 @@
 					})
 				}
 			},
-			data1() {
-				// 当列表数据改变时（比如删除某数据），触发一次刷新列表的操作
-				if (!this.createOrEditor) {
-					// 若为添加数据，则跳转到最后一个页面
-					this.changePage(Math.ceil(this.data1.length / this.pageSize))
-				} else {
-					this.changePage(this.currentPage)
+			empModal (newVal) {
+				// 如果打开模态框，则触发一次获取部门信息的操作
+				if (newVal) {
+					// 获取部门信息
+					getDeptName().then((res) => {
+						// 使用 Object.assign 给对象赋值时，推荐使用如下方法，创建一个新的对象。
+						// 若仍使用同一对象，比如this.dept = Object.assign(this.dept, res.data.departments)，vue可能监控不到它的变化。
+						this.dept = Object.assign({}, this.dept, res.data.departments)
+					})
 				}
 			}
 		},
 		mounted() {
 			// 页面加载时，触发第一次刷新列表的操作
 			this.changePage(this.currentPage)
-			// 不需要使用 this.getAllEmps()，直接使用 getAllEmps() 即可
-			getAllEmps({
-				pageNum: this.currentPage,
-				pageSize: this.pageSize
-			})
 		}
 	}
 </script>
