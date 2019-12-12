@@ -41,7 +41,7 @@
 				<i-switch v-model="showHeader" style="margin-right: 5px"></i-switch>Display header<br>
 				<i-switch v-model="fixedHeader" style="margin-right: 5px"></i-switch>Table scrolling<br>
 				<br><br>
-		
+
 				Table size
 				<Select v-model="tableSize" style="width:200px">
 					<Option value="large">large</Option>
@@ -75,7 +75,14 @@
 	</div>
 </template>
 <script>
-	import { getAllEmps, getEmp, deleteEmp, updateEmp, insertEmp, getDeptName } from './api/api.js'
+	import {
+		getAllEmps,
+		getEmp,
+		deleteEmp,
+		updateEmp,
+		insertEmp,
+		getDeptName
+	} from './api/api.js'
 	export default {
 		data() {
 			return {
@@ -152,16 +159,21 @@
 			changePage(index) {
 				// 改变当前的页码，并获取当前页码所拥有的数据
 				this.currentPage = index
-				
+
 				// 获取emps数据,分页查询
 				getAllEmps({
 					pageNum: this.currentPage,
 					pageSize: this.pageSize
 				}).then((res) => {
-					// 保存获取到的 emp 列表
-					this.data2 = res.data.pageInfo.list
-					// 保存获取数据的总数
-					this.total = res.data.pageInfo.total
+					if (res.data.success) {
+						// 保存获取到的 emp 列表
+						this.data2 = res.data.pageInfo.list
+						// 保存获取数据的总数
+						this.total = res.data.pageInfo.total
+					}
+					this.noticeType(res.data.level, res.data.messages)
+				}).catch((res) => {
+					this.noticeType()
 				})
 			},
 			show(index) {
@@ -169,7 +181,9 @@
 				this.empInfo = Object.assign(this.empInfo, this.data2[index])
 				this.empModal = true
 				this.createOrEditor = true
-				this.empInfo = Object.assign(this.empInfo, {index: index})
+				this.empInfo = Object.assign(this.empInfo, {
+					index: index
+				})
 			},
 			create() {
 				// 用于添加一条信息
@@ -178,11 +192,27 @@
 				this.createOrEditor = false
 			},
 			remove(row, index) {
-				// 删除某个员工的数据
-				deleteEmp({
-					id: row.id
-				}).then((res) => {
-					this.changePage(this.currentPage)
+				this.$Modal.confirm({
+					title: '删除',
+					content: '<p>是否删除当前数据</p>',
+					onOk: () => {
+						// 删除某个员工的数据
+						deleteEmp({
+							id: row.id
+						}).then((res) => {
+							if (res.data.success) {
+								this.changePage(this.currentPage)
+							}
+							this.noticeType(res.data.level, res.data.messages)
+						}).catch((res) => {
+							this.noticeType()
+						})
+					},
+					onCancel: () => {
+						this.$Message.info('取消删除')
+					},
+					okText: 'OK',
+					cancelText: 'Cancel'
 				})
 			},
 			changePageSize(index) {
@@ -190,37 +220,65 @@
 				this.$Message.info({
 					content: '当前页面显示条数修改为： ' + index + '条/页'
 				})
-				// 改变后，跳转到首页，并刷新列表
+				// 改变后，跳转到首页，并刷新列表(自动触发changePage)
 				this.currentPage = 1
 				this.pageSize = index
-				this.changePage(this.currentPage)
 			},
-			okEditor () {
+			okEditor() {
 				if (this.createOrEditor) {
 					// 更新某个员工的数据
 					const that = this
 					updateEmp(this.empInfo).then((res) => {
-						this.changePage(this.currentPage)
+						if (res.data.success) {
+							this.changePage(this.currentPage)
+						}
+						this.noticeType(res.data.level, res.data.messages)
+					}).catch((res) => {
+						this.noticeType()
 					})
 				} else {
 					// 新增某个员工
-					insertEmp({
-						salary: this.empInfo.salary,
-						name: this.empInfo.name,
-						age: this.empInfo.age,
-						email: this.empInfo.email,
-						deptid: this.empInfo.deptid
-					}).then((res) => {
-						this.changePage(Math.ceil((this.total + 1) / this.pageSize))
+					this.empInfo = Object.assign({}, this.empInfo, {
+						id: null
+					})
+					insertEmp(this.empInfo).then((res) => {
+						if (res.data.success) {
+							this.changePage(Math.ceil((this.total + 1) / this.pageSize))
+						}
+						this.noticeType(res.data.level, res.data.messages)
+					}).catch((res) => {
+						this.noticeType()
 					})
 				}
 				this.empInfo = {}
 			},
-			cancelEditor () {
+			cancelEditor() {
 				// 取消编辑的操作
 				this.$Message.info({
 					content: '操作取消'
 				})
+			},
+			noticeType(type, messages) {
+				switch (type) {
+					case 'info':
+						this.$Notice.success({
+							title: messages.join('\n'),
+							duration: 2
+						})
+						break
+					case 'error':
+						this.$Notice.error({
+							title: messages.join('\n'),
+							duration: 2
+						})
+						break
+					default:
+						this.$Notice.error({
+							title: '系统异常',
+							duration: 2
+						})
+						break
+				}
 			}
 		},
 		watch: {
@@ -262,14 +320,18 @@
 					})
 				}
 			},
-			empModal (newVal) {
+			empModal(newVal) {
 				// 如果打开模态框，则触发一次获取部门信息的操作
 				if (newVal) {
 					// 获取部门信息
 					getDeptName().then((res) => {
-						// 使用 Object.assign 给对象赋值时，推荐使用如下方法，创建一个新的对象。
-						// 若仍使用同一对象，比如this.dept = Object.assign(this.dept, res.data.departments)，vue可能监控不到它的变化。
-						this.dept = Object.assign({}, this.dept, res.data.departments)
+						if (res.data.success) {
+							// 使用 Object.assign 给对象赋值时，推荐使用如下方法，创建一个新的对象。
+							// 若仍使用同一对象，比如this.dept = Object.assign(this.dept, res.data.departments)，vue可能监控不到它的变化。
+							this.dept = Object.assign({}, this.dept, res.data.departments)
+						}
+					}).catch((res) => {
+						this.noticeType()
 					})
 				}
 			}
