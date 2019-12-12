@@ -220,9 +220,13 @@
 				this.$Message.info({
 					content: '当前页面显示条数修改为： ' + index + '条/页'
 				})
-				// 改变后，跳转到首页，并刷新列表(自动触发changePage)
-				this.currentPage = 1
+				// 改变后，跳转到首页，并刷新列表
 				this.pageSize = index
+				if(this.currentPage === 1) {
+					this.changePage(this.currentPage)
+					return
+				}
+				this.currentPage = 1
 			},
 			okEditor() {
 				if (this.createOrEditor) {
